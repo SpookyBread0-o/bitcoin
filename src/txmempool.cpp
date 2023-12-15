@@ -408,6 +408,7 @@ CTxMemPool::CTxMemPool(const Options& opts)
       m_min_relay_feerate{opts.min_relay_feerate},
       m_dust_relay_feerate{opts.dust_relay_feerate},
       m_permit_bare_multisig{opts.permit_bare_multisig},
+      m_permit_anchors{opts.permit_ephemeral_anchors},
       m_max_datacarrier_bytes{opts.max_datacarrier_bytes},
       m_require_standard{opts.require_standard},
       m_full_rbf{opts.full_rbf},
@@ -454,7 +455,7 @@ void CTxMemPool::addUnchecked(const CTxMemPoolEntry &entry, setEntries &setAnces
     cachedInnerUsage += entry.DynamicMemoryUsage();
 
     const CTransaction& tx = newit->GetTx();
-    std::set<uint256> setParentTransactions;
+    std::set<Txid> setParentTransactions;
     for (unsigned int i = 0; i < tx.vin.size(); i++) {
         mapNextTx.insert(std::make_pair(&tx.vin[i].prevout, &tx));
         setParentTransactions.insert(tx.vin[i].prevout.hash);
@@ -969,7 +970,7 @@ std::optional<CTxMemPool::txiter> CTxMemPool::GetIter(const uint256& txid) const
     return std::nullopt;
 }
 
-CTxMemPool::setEntries CTxMemPool::GetIterSet(const std::set<uint256>& hashes) const
+CTxMemPool::setEntries CTxMemPool::GetIterSet(const std::set<Txid>& hashes) const
 {
     CTxMemPool::setEntries ret;
     for (const auto& h : hashes) {
@@ -1144,17 +1145,25 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpends
 
     unsigned nTxnRemoved = 0;
     CFeeRate maxFeeRateRemoved(0);
-    while (!mapTx.empty() && DynamicMemoryUsage() > sizelimit) {
+    while (!mapTx.empty()) {
         indexed_transaction_set::index<descendant_score>::type::iterator it = mapTx.get<descendant_score>().begin();
+
+        // Keep trimming as long as memory is above the maximum.
+        // Also, unless min relay feerate allows it, skim away everything paying <=0 fees.
+        const bool keep_trimming{DynamicMemoryUsage() > sizelimit ||
+            (m_min_relay_feerate.GetFeePerK() > 0 && it->GetModFeesWithDescendants() <= 0)};
+        if (!keep_trimming) break;
 
         // We set the new mempool min fee to the feerate of the removed set, plus the
         // "minimum reasonable fee rate" (ie some value under which we consider txn
         // to have 0 fee). This way, we don't allow txn to enter mempool with feerate
         // equal to txn which were removed with no block in between.
         CFeeRate removed(it->GetModFeesWithDescendants(), it->GetSizeWithDescendants());
-        removed += m_incremental_relay_feerate;
-        trackPackageRemoved(removed);
-        maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
+        if (removed >= m_min_relay_feerate) {
+            removed += m_incremental_relay_feerate;
+            trackPackageRemoved(removed);
+            maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
+        }
 
         setEntries stage;
         CalculateDescendants(mapTx.project<0>(it), stage);

@@ -80,7 +80,7 @@ std::optional<std::string> HasNoNewUnconfirmed(const CTransaction& tx, const CTx
  * @returns error message if the sets intersect, std::nullopt if they are disjoint.
  */
 std::optional<std::string> EntriesAndTxidsDisjoint(const CTxMemPool::setEntries& ancestors,
-                                                   const std::set<uint256>& direct_conflicts,
+                                                   const std::set<Txid>& direct_conflicts,
                                                    const uint256& txid);
 
 /** Check that the feerate of the replacement transaction(s) is higher than the feerate of each
@@ -105,5 +105,16 @@ std::optional<std::string> PaysForRBF(CAmount original_fees,
                                       size_t replacement_vsize,
                                       CFeeRate relay_fee,
                                       const uint256& txid);
+
+/** Attempt to ensure replacement transactions are more incentive compatible to mine than the
+ * transactions they are replacing. Currently, this function requires that feerate
+ * of the replacement transaction(s) be higher than the individual feerates of
+ * all directly conflicting transactions and the ancestor feerates of all original transactions.
+ * If the direct conflict is v3, we calculate the miner score instead.
+ * */
+std::optional<std::string> CheckMinerScores(CAmount replacement_fees,
+                                            int64_t replacement_vsize,
+                                            const CTxMemPool::setEntries& direct_conflicts,
+                                            const CTxMemPool::setEntries& original_transactions);
 
 #endif // BITCOIN_POLICY_RBF_H

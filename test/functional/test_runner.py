@@ -262,6 +262,7 @@ BASE_SCRIPTS = [
     'p2p_invalid_tx.py --v2transport',
     'p2p_v2_transport.py',
     'example_test.py',
+    'mempool_accept_v3.py',
     'wallet_txn_doublespend.py --legacy-wallet',
     'wallet_multisig_descriptor_psbt.py --descriptors',
     'wallet_txn_doublespend.py --descriptors',
@@ -277,6 +278,7 @@ BASE_SCRIPTS = [
     'mempool_packages.py',
     'mempool_package_onemore.py',
     'mempool_package_limits.py',
+    'mempool_package_rbf.py',
     'feature_versionbits_warning.py',
     'rpc_preciousblock.py',
     'wallet_importprunedfunds.py --legacy-wallet',
@@ -388,6 +390,7 @@ BASE_SCRIPTS = [
     'feature_dirsymlinks.py',
     'feature_help.py',
     'feature_shutdown.py',
+    'mempool_ephemeral_anchor.py',
     'wallet_migration.py',
     'p2p_ibd_txrelay.py',
     # Don't append tests at the end to avoid merge conflicts

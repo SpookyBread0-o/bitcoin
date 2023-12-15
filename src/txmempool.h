@@ -440,6 +440,7 @@ public:
     const CFeeRate m_min_relay_feerate;
     const CFeeRate m_dust_relay_feerate;
     const bool m_permit_bare_multisig;
+    const bool m_permit_anchors;
     const std::optional<unsigned> m_max_datacarrier_bytes;
     const bool m_require_standard;
     const bool m_full_rbf;
@@ -522,7 +523,7 @@ public:
     /** Translate a set of hashes into a set of pool iterators to avoid repeated lookups.
      * Does not require that all of the hashes correspond to actual transactions in the mempool,
      * only returns the ones that exist. */
-    setEntries GetIterSet(const std::set<uint256>& hashes) const EXCLUSIVE_LOCKS_REQUIRED(cs);
+    setEntries GetIterSet(const std::set<Txid>& hashes) const EXCLUSIVE_LOCKS_REQUIRED(cs);
 
     /** Translate a list of hashes into a list of mempool iterators to avoid repeated lookups.
      * The nth element in txids becomes the nth element in the returned vector. If any of the txids
