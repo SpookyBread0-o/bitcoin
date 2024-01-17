@@ -53,9 +53,13 @@ BOOST_AUTO_TEST_CASE(ForgetPeerTest)
     TxReconciliationTracker tracker(TXRECONCILIATION_VERSION, hasher);
     NodeId peer_id0 = 0;
 
+    // Removing peer which is not there works.
+    tracker.ForgetPeer(peer_id0, true);
+    tracker.ForgetPeer(peer_id0, false);
+
     // Removing peer after pre-registring works and does not let to register the peer.
     tracker.PreRegisterPeer(peer_id0);
-    tracker.ForgetPeer(peer_id0);
+    tracker.ForgetPeer(peer_id0, true);
     BOOST_CHECK_EQUAL(tracker.RegisterPeer(peer_id0, true, 1, 1), ReconciliationRegisterResult::NOT_FOUND);
 
     // Removing peer after it is registered works.
@@ -63,7 +67,7 @@ BOOST_AUTO_TEST_CASE(ForgetPeerTest)
     BOOST_REQUIRE(!tracker.IsPeerRegistered(peer_id0));
     BOOST_REQUIRE_EQUAL(tracker.RegisterPeer(peer_id0, true, 1, 1), ReconciliationRegisterResult::SUCCESS);
     BOOST_CHECK(tracker.IsPeerRegistered(peer_id0));
-    tracker.ForgetPeer(peer_id0);
+    tracker.ForgetPeer(peer_id0, true);
     BOOST_CHECK(!tracker.IsPeerRegistered(peer_id0));
 }
 
@@ -80,7 +84,7 @@ BOOST_AUTO_TEST_CASE(IsPeerRegisteredTest)
     BOOST_REQUIRE_EQUAL(tracker.RegisterPeer(peer_id0, true, 1, 1), ReconciliationRegisterResult::SUCCESS);
     BOOST_CHECK(tracker.IsPeerRegistered(peer_id0));
 
-    tracker.ForgetPeer(peer_id0);
+    tracker.ForgetPeer(peer_id0, true);
     BOOST_CHECK(!tracker.IsPeerRegistered(peer_id0));
 }
 
@@ -109,7 +113,7 @@ BOOST_AUTO_TEST_CASE(AddToSetTest)
     BOOST_REQUIRE(!r.m_conflict.has_value());
 
     // If the peer is dropped, adding wtxids to its set should fail
-    tracker.ForgetPeer(peer_id0);
+    tracker.ForgetPeer(peer_id0, true);
     Wtxid wtxid2{Wtxid::FromUint256(frc.rand256())};
     r = tracker.AddToSet(peer_id0, wtxid2);
     BOOST_REQUIRE(!r.m_succeeded);
@@ -154,7 +158,7 @@ BOOST_AUTO_TEST_CASE(TryRemovingFromSetTest)
     BOOST_REQUIRE(!tracker.TryRemovingFromSet(peer_id0, wtxid));
 
     BOOST_REQUIRE(tracker.AddToSet(peer_id0, wtxid).m_succeeded);
-    tracker.ForgetPeer(peer_id0);
+    tracker.ForgetPeer(peer_id0, true);
     BOOST_REQUIRE(!tracker.TryRemovingFromSet(peer_id0, wtxid));
 }
 
@@ -194,7 +198,7 @@ BOOST_AUTO_TEST_CASE(ShouldFanoutToTest)
                                             /*inbounds_fanout_tx_relay=*/0, /*outbounds_fanout_tx_relay=*/1));
     }
 
-    tracker.ForgetPeer(peer_id0);
+    tracker.ForgetPeer(peer_id0, false);
     // A forgotten (reconciliation-wise) peer should be always selected for fanout again.
     for (int i = 0; i < 100; ++i) {
         BOOST_CHECK(tracker.ShouldFanoutTo(Wtxid::FromUint256(frc.rand256()), peer_id0,
