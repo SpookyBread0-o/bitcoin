@@ -2012,8 +2012,14 @@ std::optional<MigrationData> LegacyScriptPubKeyMan::MigrateToDescriptor()
 
 bool LegacyScriptPubKeyMan::DeleteRecords()
 {
+    return RunWithinTxn(m_storage.GetDatabase(), /*process_desc=*/"delete legacy records", [&](WalletBatch& batch){
+        return DeleteRecords(batch);
+    });
+}
+
+bool LegacyScriptPubKeyMan::DeleteRecords(WalletBatch& batch)
+{
     LOCK(cs_KeyStore);
-    WalletBatch batch(m_storage.GetDatabase());
     return batch.EraseRecords(DBKeys::LEGACY_TYPES);
 }
 
