@@ -4590,4 +4590,14 @@ void CWallet::RefreshAllTXOs()
         RefreshWalletTxTXOs(wtx);
     }
 }
+
+std::optional<WalletTXO> CWallet::GetTXO(const COutPoint& outpoint) const
+{
+    AssertLockHeld(cs_wallet);
+    const auto& it = m_txos.find(outpoint);
+    if (it == m_txos.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
 } // namespace wallet
