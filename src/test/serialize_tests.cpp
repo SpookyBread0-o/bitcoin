@@ -292,7 +292,7 @@ public:
         if (s.GetParams().m_base_format == BaseFormat::RAW) {
             s << m_base_data;
         } else {
-            s << Span{HexStr(Span{&m_base_data, 1})};
+            s << Span<const char>{HexStr(Span{&m_base_data, 1})};
         }
     }
 
