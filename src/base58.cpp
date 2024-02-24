@@ -1,22 +1,25 @@
-// Copyright (c) 2014-2022 The Bitcoin Core developers
+// Copyright (c) 2014-2024 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <base58.h>
-
 #include <hash.h>
 #include <uint256.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 
-#include <assert.h>
-#include <string.h>
-
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <limits>
+#include <vector>
+#include <cassert>
+#include <cstring>
 
-/** All alphanumeric characters except for "0", "I", "O", and "l" */
-static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-static const int8_t mapBase58[256] = {
+// The Base58 character set excluding "0", "I", "O", and "l" for clarity.
+static constexpr auto pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+// Each ASCII character and its Base58 value, with -1 indicating an invalid character for Base58.
+static constexpr int8_t mapBase58[256] = {
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
@@ -35,6 +38,11 @@ static const int8_t mapBase58[256] = {
     -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
 };
 
+static constexpr int base{58};
+static constexpr int64_t baseScale{1000LL};
+static constexpr int64_t log58_256Ratio =  733LL;  // Approximation of log(base)/log(256), scaled by baseScale.
+static constexpr int64_t log256_58Ratio = 1366LL; // Approximation of log(256)/log(base), scaled by baseScale.
+
 [[nodiscard]] static bool DecodeBase58(const char* psz, std::vector<unsigned char>& vch, int max_ret_len)
 {
     // Skip leading spaces.
@@ -48,8 +56,7 @@ static const int8_t mapBase58[256] = {
         if (zeroes > max_ret_len) return false;
         psz++;
     }
-    // Allocate enough space in big-endian base256 representation.
-    int size = strlen(psz) * 733 /1000 + 1; // log(58) / log(256), rounded up.
+    const int size = 1 + strlen(psz) * log58_256Ratio / baseScale;
     std::vector<unsigned char> b256(size);
     // Process the characters.
     static_assert(std::size(mapBase58) == 256, "mapBase58.size() should be 256"); // guarantee not out of range
@@ -60,7 +67,7 @@ static const int8_t mapBase58[256] = {
             return false;
         int i = 0;
         for (std::vector<unsigned char>::reverse_iterator it = b256.rbegin(); (carry != 0 || i < length) && (it != b256.rend()); ++it, ++i) {
-            carry += 58 * (*it);
+            carry += base * (*it);
             *it = carry % 256;
             carry /= 256;
         }
@@ -93,8 +100,7 @@ std::string EncodeBase58(Span<const unsigned char> input)
         input = input.subspan(1);
         zeroes++;
     }
-    // Allocate enough space in big-endian base58 representation.
-    int size = input.size() * 138 / 100 + 1; // log(256) / log(58), rounded up.
+    const int size = 1 + input.size() * log256_58Ratio / baseScale;
     std::vector<unsigned char> b58(size);
     // Process the bytes.
     while (input.size() > 0) {
@@ -103,8 +109,8 @@ std::string EncodeBase58(Span<const unsigned char> input)
         // Apply "b58 = b58 * 256 + ch".
         for (std::vector<unsigned char>::reverse_iterator it = b58.rbegin(); (carry != 0 || i < length) && (it != b58.rend()); it++, i++) {
             carry += 256 * (*it);
-            *it = carry % 58;
-            carry /= 58;
+            *it = carry % base;
+            carry /= base;
         }
 
         assert(carry == 0);
