@@ -34,6 +34,9 @@ const int8_t CHARSET_REV[128] = {
      1,  0,  3, 16, 11, 28, 12, 14,  6,  4,  2, -1, -1, -1, -1, -1
 };
 
+/** The Bech32 and Bech32m checksum size */
+constexpr size_t CHECKSUM_SIZE = 6;
+
 /** We work with the finite field GF(1024) defined as a degree 2 extension of the base field GF(32)
  * The defining polynomial of the extension is x^2 + 9x + 23.
  * Let (e) be a root of this defining polynomial. Then (e) is a primitive element of GF(1024),
@@ -339,12 +342,13 @@ Encoding VerifyChecksum(const std::string& hrp, const data& values)
 data CreateChecksum(Encoding encoding, const std::string& hrp, const data& values)
 {
     data enc = Cat(ExpandHRP(hrp), values);
-    enc.resize(enc.size() + 6); // Append 6 zeroes
+    enc.resize(enc.size() + CHECKSUM_SIZE); // Append 6 zeroes
     uint32_t mod = PolyMod(enc) ^ EncodingConstant(encoding); // Determine what to XOR into those 6 zeroes.
-    data ret(6);
-    for (size_t i = 0; i < 6; ++i) {
-        // Convert the 5-bit groups in mod to checksum values.
-        ret[i] = (mod >> (5 * (5 - i))) & 31;
+
+    data ret;
+    ret.reserve(CHECKSUM_SIZE);
+    for (size_t i = 0; i < CHECKSUM_SIZE; ++i) {
+        ret.push_back((mod >> (5 * (5 - i))) & 31); // Convert the 5-bit groups in mod to checksum values.
     }
     return ret;
 }
@@ -372,7 +376,7 @@ DecodeResult Decode(const std::string& str) {
     std::vector<int> errors;
     if (!CheckCharacters(str, errors)) return {};
     size_t pos = str.rfind('1');
-    if (str.size() > 90 || pos == str.npos || pos == 0 || pos + 7 > str.size()) {
+    if (str.size() > 90 || pos == str.npos || pos == 0 || pos + CHECKSUM_SIZE >= str.size()) {
         return {};
     }
     data values(str.size() - 1 - pos);
@@ -392,7 +396,7 @@ DecodeResult Decode(const std::string& str) {
     }
     Encoding result = VerifyChecksum(hrp, values);
     if (result == Encoding::INVALID) return {};
-    return {result, std::move(hrp), data(values.begin(), values.end() - 6)};
+    return {result, std::move(hrp), data(values.begin(), values.end() - CHECKSUM_SIZE)};
 }
 
 /** Find index of an incorrect character in a Bech32 string. */
@@ -413,7 +417,7 @@ std::pair<std::string, std::vector<int>> LocateErrors(const std::string& str) {
     if (pos == str.npos) {
         return std::make_pair("Missing separator", std::vector<int>{});
     }
-    if (pos == 0 || pos + 7 > str.size()) {
+    if (pos == 0 || pos + CHECKSUM_SIZE >= str.size()) {
         error_locations.push_back(pos);
         return std::make_pair("Invalid separator position", std::move(error_locations));
     }
