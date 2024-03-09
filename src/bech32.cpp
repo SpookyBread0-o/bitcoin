@@ -388,6 +388,7 @@ DecodeResult Decode(const std::string& str) {
         values[i] = rev;
     }
     std::string hrp;
+    hrp.reserve(pos);
     for (size_t i = 0; i < pos; ++i) {
         hrp += LowerCase(str[i]);
     }
@@ -420,6 +421,7 @@ std::pair<std::string, std::vector<int>> LocateErrors(const std::string& str) {
     }
 
     std::string hrp;
+    hrp.reserve(pos);
     for (size_t i = 0; i < pos; ++i) {
         hrp += LowerCase(str[i]);
     }
