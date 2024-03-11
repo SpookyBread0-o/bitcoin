@@ -1440,7 +1440,7 @@ void CWallet::transactionAddedToMempool(const CTransactionRef& tx) {
     }
 }
 
-void CWallet::transactionRemovedFromMempool(const CTransactionRef& tx, MemPoolRemovalReason reason) {
+void CWallet::transactionRemovedFromMempool(const CTransactionRef& tx, const MemPoolRemovalReason& reason) {
     LOCK(cs_wallet);
     auto it = mapWallet.find(tx->GetHash());
     if (it != mapWallet.end()) {
@@ -1448,7 +1448,7 @@ void CWallet::transactionRemovedFromMempool(const CTransactionRef& tx, MemPoolRe
     }
     // Handle transactions that were removed from the mempool because they
     // conflict with transactions in a newly connected block.
-    if (reason == MemPoolRemovalReason::CONFLICT) {
+    if (std::get_if<ConflictReason>(&reason)) {
         // Trigger external -walletnotify notifications for these transactions.
         // Set Status::UNCONFIRMED instead of Status::CONFLICTED for a few reasons:
         //
@@ -1510,7 +1510,7 @@ void CWallet::blockConnected(ChainstateRole role, const interfaces::BlockInfo& b
     // Scan block
     for (size_t index = 0; index < block.data->vtx.size(); index++) {
         SyncTransaction(block.data->vtx[index], TxStateConfirmed{block.hash, block.height, static_cast<int>(index)});
-        transactionRemovedFromMempool(block.data->vtx[index], MemPoolRemovalReason::BLOCK);
+        transactionRemovedFromMempool(block.data->vtx[index], BlockReason{});
     }
 }
 
