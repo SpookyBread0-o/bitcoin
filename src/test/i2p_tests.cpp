@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(listen_ok_accept_fail)
     for (size_t i = 0; i < 5; ++i) {
         ASSERT_DEBUG_LOG("Creating persistent SAM session");
         ASSERT_DEBUG_LOG("Persistent SAM session" /* ... created */);
-        ASSERT_DEBUG_LOG("Error accepting");
+        ASSERT_DEBUG_LOG("Accept was interrupted");
         ASSERT_DEBUG_LOG("Destroying SAM session");
         BOOST_REQUIRE(session.Listen(conn));
         BOOST_REQUIRE(!session.Accept(conn));
