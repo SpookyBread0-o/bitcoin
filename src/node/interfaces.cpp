@@ -31,6 +31,7 @@
 #include <node/interface_ui.h>
 #include <node/mini_miner.h>
 #include <node/transaction.h>
+#include <node/warnings.h>
 #include <policy/feerate.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
@@ -52,7 +53,6 @@
 #include <util/translation.h>
 #include <validation.h>
 #include <validationinterface.h>
-#include <warnings.h>
 
 #include <config/bitcoin-config.h> // IWYU pragma: keep
 
