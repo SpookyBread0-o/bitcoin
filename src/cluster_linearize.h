@@ -518,14 +518,28 @@ public:
  *                                   that will be performed in order to find a good linearization.
  *                                   On output the number will be reduced by the number of actually
  *                                   performed optimization steps. If that number is nonzero, the
- *                                   linearization is optimal.
+ *                                   linearization is optimal. Otherwise it is at least as good
+ *                                   as old_linearization (if provided).
  * @param[in]     rng_seed           A random number seed to control search order.
+ * @param[in]     old_linearization  An existing linearization for the cluster, or empty.
  */
 template<typename S>
-std::vector<ClusterIndex> Linearize(const DepGraph<S>& depgraph, uint64_t& iteration_limit, uint64_t rng_seed) noexcept
+std::vector<ClusterIndex> Linearize(const DepGraph<S>& depgraph, uint64_t& iteration_limit, uint64_t rng_seed, Span<const ClusterIndex> old_linearization = {}) noexcept
 {
     auto todo = S::Fill(depgraph.TxCount());
     std::vector<ClusterIndex> linearization;
+
+    // Precompute chunking of the existing linearization.
+    std::vector<std::pair<S, FeeFrac>> chunks;
+    for (auto i : old_linearization) {
+        std::pair<S, FeeFrac> new_chunk{S::Singleton(i), depgraph.FeeRate(i)};
+        while (!chunks.empty() && new_chunk.second >> chunks.back().second) {
+            new_chunk.first |= chunks.back().first;
+            new_chunk.second += chunks.back().second;
+            chunks.pop_back();
+        }
+        chunks.push_back(std::move(new_chunk));
+    }
 
     AncestorCandidateFinder anc_finder(depgraph);
     SearchCandidateFinder src_finder(depgraph, rng_seed);
@@ -533,8 +547,28 @@ std::vector<ClusterIndex> Linearize(const DepGraph<S>& depgraph, uint64_t& itera
     bool perfect = true;
 
     while (todo.Any()) {
-        // Initialize best as the best ancestor set.
-        auto best = anc_finder.FindCandidateSet();
+        // This is an implementation of the (single) LIMO algorithm:
+        // https://delvingbitcoin.org/t/limo-combining-the-best-parts-of-linearization-search-and-merging/825
+        // where S is instantiated to be the result of a bounded search, which itself is seeded
+        // with the best prefix of what remains of the input linearization, or the best ancestor set.
+
+        // Find the highest-feerate prefix of remainder of original chunks.
+        std::pair<S, FeeFrac> best_prefix, best_prefix_acc;
+        for (const auto& [chunk, chunk_feerate] : chunks) {
+            S intersect = chunk & todo;
+            if (intersect.Any()) {
+                best_prefix_acc.first |= intersect;
+                best_prefix_acc.second += depgraph.FeeRate(intersect);
+                if (best_prefix.second.IsEmpty() || best_prefix_acc.second > best_prefix.second) {
+                    best_prefix = best_prefix_acc;
+                }
+            }
+        }
+
+        // Then initialize best to be either the best ancestor set, or the first chunk.
+        auto best_anc = anc_finder.FindCandidateSet();
+        auto best = best_anc;
+        if (!best_prefix.second.IsEmpty() && best_prefix.second > best.second) best = best_prefix;
 
         // Invoke bounded search to update best, with up to half of our remaining iterations as
         // limit.
@@ -545,6 +579,24 @@ std::vector<ClusterIndex> Linearize(const DepGraph<S>& depgraph, uint64_t& itera
 
         if (iterations == 0) {
             perfect = false;
+            // If the search result is not (guaranteed to be) optimal, run intersections to make
+            // sure we don't pick something that makes us unable to reach further diagram points
+            // of the old linearization.
+            if (best.first != best_prefix.first) {
+                std::pair<S, FeeFrac> acc;
+                for (const auto& [chunk, chunk_feerate] : chunks) {
+                    S intersect = chunk & best.first;
+                    if (intersect.Any()) {
+                        acc.first |= intersect;
+                        if (acc.first == best.first) break;
+                        acc.second += depgraph.FeeRate(intersect);
+                        if (acc.second > best.second) {
+                            best = acc;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         // Add to output in topological order.
