@@ -662,6 +662,22 @@ bool CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight, const Remo
     return true;
 }
 
+void CBlockPolicyEstimator::removeParentTxs(const std::vector<RemovedMempoolTransactionInfo>& txs_removed_for_block)
+{
+    std::set<Txid> seen_transactions;
+    for (const auto& tx : txs_removed_for_block) {
+        seen_transactions.insert(tx.info.m_tx->GetHash());
+        for (const auto& input : tx.info.m_tx->vin) {
+            const Txid& parentId = input.prevout.hash;
+            if (seen_transactions.count(parentId)) {
+                // Ignore any transaction with a child in the received block
+                // It may be fee bumped by the child.
+                _removeTx(parentId, /*inblock=*/true);
+                seen_transactions.erase(parentId);
+            }
+        }
+    }
+}
 void CBlockPolicyEstimator::processBlock(const std::vector<RemovedMempoolTransactionInfo>& txs_removed_for_block,
                                          unsigned int nBlockHeight)
 {
@@ -689,6 +705,8 @@ void CBlockPolicyEstimator::processBlock(const std::vector<RemovedMempoolTransac
     feeStats->UpdateMovingAverages();
     shortStats->UpdateMovingAverages();
     longStats->UpdateMovingAverages();
+
+    removeParentTxs(txs_removed_for_block);
 
     unsigned int countedTxs = 0;
     // Update averages with data points from current block
