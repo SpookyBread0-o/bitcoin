@@ -1088,6 +1088,7 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     coin_selection_params.tx_noinputs_size = 10 + GetSizeOfCompactSize(vecSend.size()); // bytes for output count
 
     // vouts to the payees
+    txNew.vout.reserve(vecSend.size() + 1); // accommodate the possible later inserts
     for (const auto& recipient : vecSend)
     {
         CTxOut txout(recipient.nAmount, GetScriptForDestination(recipient.dest));
