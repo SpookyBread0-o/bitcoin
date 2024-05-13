@@ -15,15 +15,12 @@ Interesting test cases could be loading an assumeutxo snapshot file with:
 
 - TODO: Valid snapshot file, but referencing a snapshot block that turns out to be
       invalid, or has an invalid parent
-- TODO: Valid snapshot file and snapshot block, but the block is not on the
-      most-work chain
 
 Interesting starting states could be loading a snapshot when the current chain tip is:
 
 - TODO: An ancestor of snapshot block
 - TODO: The snapshot block
 - TODO: A descendant of the snapshot block
-- TODO: Not an ancestor or a descendant of the snapshot block and has more work
 
 """
 from shutil import rmtree
@@ -175,6 +172,19 @@ class AssumeutxoTest(BitcoinTestFramework):
         loaded = node.loadtxoutset(dump_output_path)
         assert_equal(loaded['coins_loaded'], SNAPSHOT_BASE_HEIGHT)
         assert_equal(loaded['base_height'], SNAPSHOT_BASE_HEIGHT)
+
+        # Restart the node and delete the snapshot chainstate from previous test.
+        self.restart_node(2, extra_args=['-reindex-chainstate=1', *self.extra_args[2]])
+        assert node.getblockcount() < SNAPSHOT_BASE_HEIGHT
+
+        self.log.info(f"Check importing a snapshot where current chain-tip is not an ancestor or a descendant of the snapshot block and has more work")
+        # Generate two extra blocks and make sure node2's chain has more work than the snapshot's chain
+        # This covers the scenario where the snapshot block is not on the most-work chain
+        self.generate(node, nblocks=2, sync_fun=self.no_op)
+        assert node.getblockcount() > SNAPSHOT_BASE_HEIGHT
+        # Import the snapshot and assert its failure
+        with node.assert_debug_log(expected_msgs=["[snapshot] activation failed - work does not exceed active chainstate"]):
+            assert_raises_rpc_error(-32603, "Unable to load UTXO snapshot", node.loadtxoutset, dump_output_path)
 
     def run_test(self):
         """
