@@ -21,7 +21,6 @@ Interesting test cases could be loading an assumeutxo snapshot file with:
 Interesting starting states could be loading a snapshot when the current chain tip is:
 
 - TODO: An ancestor of snapshot block
-- TODO: Not an ancestor of the snapshot block but has less work
 - TODO: The snapshot block
 - TODO: A descendant of the snapshot block
 - TODO: Not an ancestor or a descendant of the snapshot block and has more work
@@ -160,6 +159,22 @@ class AssumeutxoTest(BitcoinTestFramework):
         node = self.nodes[0]
         path = node.datadir_path / node.chain / "invalid" / "path"
         assert_raises_rpc_error(-8, "Couldn't open file {} for reading.".format(path), node.loadtxoutset, path)
+
+    def test_snapshot_in_a_divergent_chain(self, dump_output_path):
+        # First rollback node2's chain to the pregenerated one, up to height 199
+        node = self.nodes[2]
+        block_hash = node.getblockhash(START_HEIGHT + 1)
+        node.invalidateblock(block_hash)
+        assert_equal(node.getblockcount(), START_HEIGHT)
+
+        self.log.info(f"Check importing a snapshot where current chain-tip is not an ancestor of the snapshot block but has less work")
+        # Generate a divergent chain in node2 but with less work compared to the snapshot
+        self.generate(node, nblocks=SNAPSHOT_BASE_HEIGHT-START_HEIGHT-1, sync_fun=self.no_op)
+        assert node.getblockcount() < SNAPSHOT_BASE_HEIGHT
+        # Try importing the snapshot and assert its success
+        loaded = node.loadtxoutset(dump_output_path)
+        assert_equal(loaded['coins_loaded'], SNAPSHOT_BASE_HEIGHT)
+        assert_equal(loaded['base_height'], SNAPSHOT_BASE_HEIGHT)
 
     def run_test(self):
         """
@@ -375,10 +390,10 @@ class AssumeutxoTest(BitcoinTestFramework):
                 self.wait_until(lambda: n.getindexinfo() == completed_idx_state)
 
 
-        # Node 2: all indexes + reindex
-        # -----------------------------
+        # Node 2: all indexes + reindex + divergent chain
+        # -----------------------------------------------
 
-        self.log.info("-- Testing all indexes + reindex")
+        self.log.info("-- Testing all indexes + reindex + divergent chain")
         assert_equal(n2.getblockcount(), START_HEIGHT)
 
         self.log.info(f"Loading snapshot into third node from {dump_output['path']}")
@@ -447,6 +462,8 @@ class AssumeutxoTest(BitcoinTestFramework):
         self.restart_node(2, extra_args=['-reindex=1', *self.extra_args[2]])
         self.connect_nodes(0, 2)
         self.wait_until(lambda: n2.getblockcount() == FINAL_HEIGHT)
+
+        self.test_snapshot_in_a_divergent_chain(dump_output['path'])
 
 @dataclass
 class Block:
