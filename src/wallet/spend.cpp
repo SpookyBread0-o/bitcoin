@@ -1091,7 +1091,7 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     txNew.vout.reserve(vecSend.size() + 1); // accommodate the possible later inserts
     for (const auto& recipient : vecSend)
     {
-        CTxOut txout(recipient.nAmount, GetScriptForDestination(recipient.dest));
+        auto& txout = txNew.vout.emplace_back(recipient.nAmount, GetScriptForDestination(recipient.dest));
 
         // Include the fee cost for outputs.
         coin_selection_params.tx_noinputs_size += ::GetSerializeSize(txout);
@@ -1099,7 +1099,6 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         if (IsDust(txout, wallet.chain().relayDustFee())) {
             return util::Error{_("Transaction amount too small")};
         }
-        txNew.vout.push_back(txout);
     }
 
     // Include the fees for things that aren't inputs, excluding the change output
