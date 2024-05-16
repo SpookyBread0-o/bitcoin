@@ -492,6 +492,8 @@ public:
                     CTxMemPool& pool, Options opts);
 
     /** Overridden from CValidationInterface. */
+    void UpdatedBlockTipSync(const CBlockIndex* pindexNew) override
+        EXCLUSIVE_LOCKS_REQUIRED(!m_recent_confirmed_transactions_mutex, !m_tx_download_mutex);
     void BlockConnected(ChainstateRole role, const std::shared_ptr<const CBlock>& pblock, const CBlockIndex* pindexConnected) override
         EXCLUSIVE_LOCKS_REQUIRED(!m_recent_confirmed_transactions_mutex, !m_tx_download_mutex);
     void BlockDisconnected(const std::shared_ptr<const CBlock> &block, const CBlockIndex* pindex) override
@@ -2090,6 +2092,18 @@ void PeerManagerImpl::StartScheduledTasks(CScheduler& scheduler)
     scheduler.scheduleFromNow([&] { ReattemptInitialBroadcast(scheduler); }, delta);
 }
 
+void PeerManagerImpl::UpdatedBlockTipSync(const CBlockIndex* pindexNew)
+{
+    AssertLockNotHeld(m_mempool.cs);
+    LOCK(m_tx_download_mutex);
+    // If the chain tip has changed, previously rejected transactions might now be invalid, e.g. due
+    // to a timelock. Reset the rejection filters to give those transactions another chance if we
+    // see them again.
+    m_recent_rejects.reset();
+    m_recent_rejects_reconsiderable.reset();
+    hashRecentRejectsChainTip = pindexNew->GetBlockHash();
+}
+
 /**
  * Evict orphan txn pool entries based on a newly connected
  * block, remember the recently confirmed transactions, and delete tracked
@@ -2293,7 +2307,8 @@ bool PeerManagerImpl::AlreadyHaveTx(const GenTxid& gtxid, bool include_reconside
     AssertLockHeld(::cs_main);
     AssertLockHeld(m_tx_download_mutex);
 
-    if (m_chainman.ActiveChain().Tip()->GetBlockHash() != hashRecentRejectsChainTip) {
+    if (!Assume(hashRecentRejectsChainTip == uint256::ZERO ||
+                hashRecentRejectsChainTip == m_chainman.ActiveChain().Tip()->GetBlockHash())) {
         // If the chain tip has changed previously rejected transactions
         // might be now valid, e.g. due to a nLockTime'd tx becoming valid,
         // or a double-spend. Reset the rejects filter and give those
