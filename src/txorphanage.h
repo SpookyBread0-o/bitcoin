@@ -99,7 +99,7 @@ protected:
     std::vector<OrphanMap::iterator> m_orphan_list;
 
     /** Erase an orphan by wtxid */
-    int EraseTxNoLock(const Wtxid& wtxid);
+    int EraseTxInternal(const Wtxid& wtxid);
 };
 
 #endif // BITCOIN_TXORPHANAGE_H

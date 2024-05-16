@@ -52,10 +52,10 @@ bool TxOrphanage::AddTx(const CTransactionRef& tx, NodeId peer)
 
 int TxOrphanage::EraseTx(const Wtxid& wtxid)
 {
-    return EraseTxNoLock(wtxid);
+    return EraseTxInternal(wtxid);
 }
 
-int TxOrphanage::EraseTxNoLock(const Wtxid& wtxid)
+int TxOrphanage::EraseTxInternal(const Wtxid& wtxid)
 {
     std::map<Wtxid, OrphanTx>::iterator it = m_orphans.find(wtxid);
     if (it == m_orphans.end())
@@ -101,7 +101,7 @@ void TxOrphanage::EraseForPeer(NodeId peer)
         // increment to avoid iterator becoming invalid after erasure
         const auto& [wtxid, orphan] = *iter++;
         if (orphan.fromPeer == peer) {
-            nErased += EraseTxNoLock(wtxid);
+            nErased += EraseTxInternal(wtxid);
         }
     }
     if (nErased > 0) LogPrint(BCLog::TXPACKAGES, "Erased %d orphan transaction(s) from peer=%d\n", nErased, peer);
@@ -121,7 +121,7 @@ void TxOrphanage::LimitOrphans(unsigned int max_orphans, FastRandomContext& rng)
         {
             std::map<Wtxid, OrphanTx>::iterator maybeErase = iter++;
             if (maybeErase->second.nTimeExpire <= nNow) {
-                nErased += EraseTxNoLock(maybeErase->second.tx->GetWitnessHash());
+                nErased += EraseTxInternal(maybeErase->second.tx->GetWitnessHash());
             } else {
                 nMinExpTime = std::min(maybeErase->second.nTimeExpire, nMinExpTime);
             }
@@ -134,7 +134,7 @@ void TxOrphanage::LimitOrphans(unsigned int max_orphans, FastRandomContext& rng)
     {
         // Evict a random orphan:
         size_t randompos = rng.randrange(m_orphan_list.size());
-        EraseTxNoLock(m_orphan_list[randompos]->second.tx->GetWitnessHash());
+        EraseTxInternal(m_orphan_list[randompos]->second.tx->GetWitnessHash());
         ++nEvicted;
     }
     if (nEvicted > 0) LogPrint(BCLog::TXPACKAGES, "orphanage overflow, removed %u tx\n", nEvicted);
@@ -213,7 +213,7 @@ void TxOrphanage::EraseForBlock(const CBlock& block)
     if (vOrphanErase.size()) {
         int nErased = 0;
         for (const auto& orphanHash : vOrphanErase) {
-            nErased += EraseTxNoLock(orphanHash);
+            nErased += EraseTxInternal(orphanHash);
         }
         LogPrint(BCLog::TXPACKAGES, "Erased %d orphan transaction(s) included or conflicted by block\n", nErased);
     }
