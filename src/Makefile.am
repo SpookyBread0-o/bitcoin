@@ -310,6 +310,7 @@ BITCOIN_CORE_H = \
   util/macros.h \
   util/message.h \
   util/moneystr.h \
+  util/netif.h \
   util/overflow.h \
   util/overloaded.h \
   util/rbf.h \
@@ -743,6 +744,7 @@ libbitcoin_util_a_SOURCES = \
   util/sock.cpp \
   util/syserror.cpp \
   util/message.cpp \
+  util/netif.cpp \
   util/moneystr.cpp \
   util/rbf.cpp \
   util/readwritefile.cpp \
