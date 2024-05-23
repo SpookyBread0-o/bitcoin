@@ -97,9 +97,6 @@ protected:
 
     /** Orphan transactions in vector for quick random eviction */
     std::vector<OrphanMap::iterator> m_orphan_list;
-
-    /** Erase an orphan by wtxid */
-    int EraseTxNoLock(const Wtxid& wtxid);
 };
 
 #endif // BITCOIN_TXORPHANAGE_H
