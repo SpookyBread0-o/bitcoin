@@ -213,6 +213,7 @@ static CNetAddr PCPUnwrapAddress(Span<const uint8_t> wrapped_addr)
 
 //! PCP or NAT-PMP send-receive loop.
 static std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &protocol, Span<const uint8_t> request, int num_tries,
+        std::chrono::milliseconds timeout_per_try,
         std::function<bool(const Span<const uint8_t>)> check_packet)
 {
     // UDP is a potentially lossy protocol, so we try to send again a few times.
@@ -230,9 +231,11 @@ static std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::st
         }
 
         // Wait for response(s) until we get a valid response, a network error, or time out.
-        while (true) {
+        auto cur_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now());
+        auto deadline = cur_time + timeout_per_try;
+        while ((cur_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now())) < deadline) {
             Sock::Event occurred = 0;
-            if (!sock.Wait(std::chrono::milliseconds(1000), Sock::RECV, &occurred)) {
+            if (!sock.Wait(deadline - cur_time, Sock::RECV, &occurred)) {
                 LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "%s: Could not wait on socket: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
                 return std::nullopt; // Network-level error, probably no use retrying.
             }
@@ -262,7 +265,7 @@ static std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::st
     return std::vector<uint8_t>(response, response + recvsz);
 }
 
-std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &gateway, uint16_t port, uint32_t lifetime, int num_tries)
+std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &gateway, uint16_t port, uint32_t lifetime, int num_tries, std::chrono::milliseconds timeout_per_try)
 {
     struct sockaddr_storage dest_addr;
     socklen_t dest_addrlen = sizeof(struct sockaddr_storage);
@@ -300,7 +303,7 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
     request[NATPMP_HDR_VERSION_OFS] = NATPMP_VERSION;
     request[NATPMP_HDR_OP_OFS] = NATPMP_REQUEST | NATPMP_OP_GETEXTERNAL;
 
-    auto recv_res = PCPSendRecv(sock, "natpmp", request, num_tries,
+    auto recv_res = PCPSendRecv(sock, "natpmp", request, num_tries, timeout_per_try,
         [&](const Span<const uint8_t> response) -> bool {
             if (response.size() < NATPMP_GETEXTERNAL_RESPONSE_SIZE) {
                 LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "natpmp: Response too small\n");
@@ -337,7 +340,7 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
     WriteBE16(request.data() + NATPMP_MAP_REQUEST_EXTERNAL_PORT_OFS, port);
     WriteBE32(request.data() + NATPMP_MAP_REQUEST_LIFETIME_OFS, lifetime);
 
-    recv_res = PCPSendRecv(sock, "natpmp", request, num_tries,
+    recv_res = PCPSendRecv(sock, "natpmp", request, num_tries, timeout_per_try,
         [&](const Span<const uint8_t> response) -> bool {
             if (response.size() < NATPMP_MAP_RESPONSE_SIZE) {
                 LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "natpmp: Response too small\n");
@@ -376,7 +379,7 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
     }
 }
 
-std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonce &nonce, const CNetAddr &gateway, const CNetAddr &bind, uint16_t port, uint32_t lifetime, int num_tries)
+std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonce &nonce, const CNetAddr &gateway, const CNetAddr &bind, uint16_t port, uint32_t lifetime, int num_tries, std::chrono::milliseconds timeout_per_try)
 {
     struct sockaddr_storage dest_addr, bind_addr;
     socklen_t dest_addrlen = sizeof(struct sockaddr_storage), bind_addrlen = sizeof(struct sockaddr_storage);
@@ -449,7 +452,7 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
 
     // Receive loop.
     bool is_natpmp = false;
-    auto recv_res = PCPSendRecv(sock, "pcp", request, num_tries,
+    auto recv_res = PCPSendRecv(sock, "pcp", request, num_tries, timeout_per_try,
         [&](const Span<const uint8_t> response) -> bool {
             // Unsupported version according to RFC6887 appendix A and RFC6886 section 3.5, can fall back to NAT-PMP.
             if (response.size() == NATPMP_RESPONSE_HDR_SIZE && response[PCP_HDR_VERSION_OFS] == NATPMP_VERSION && response[PCP_RESPONSE_HDR_RESULT_OFS] == NATPMP_RESULT_UNSUPP_VERSION) {
