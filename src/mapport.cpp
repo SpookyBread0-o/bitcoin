@@ -64,7 +64,7 @@ static bool ProcessPCP()
             ret = true;
             actual_lifetime = std::min(actual_lifetime, mapping->lifetime);
         } else if (MappingError *err = std::get_if<MappingError>(&res)) {
-            // Detailed error will already have been logged internally in respective Pormap function.
+            // Detailed error will already have been logged internally in respective Portmap function.
             if (*err == MappingError::NO_RESOURCES) {
                 no_resources = true;
             }
