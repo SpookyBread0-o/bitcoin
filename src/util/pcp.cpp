@@ -19,7 +19,7 @@
 // NAT-PMP and PCP use network byte order (big-endian).
 
 // NAT-PMP (v0) protocol constants.
-//! NAT-PMP uses a fixed server port number (RPC6887 section 1.1).
+//! NAT-PMP uses a fixed server port number (RFC6887 section 1.1).
 constexpr uint16_t NATPMP_SERVER_PORT = 5351;
 //! Version byte for NATPMP (RFC6886 1.1)
 constexpr uint8_t NATPMP_VERSION = 0;
@@ -80,7 +80,7 @@ constexpr uint8_t NATPMP_RESULT_UNSUPP_VERSION = 1;
 //! Result code representing lack of resources.
 constexpr uint8_t NATPMP_RESULT_NO_RESOURCES = 4;
 
-//! Mapping of NATPMP result code to string (RPC6886 3.5). Result codes <=2 match PCP.
+//! Mapping of NATPMP result code to string (RFC6886 3.5). Result codes <=2 match PCP.
 static const std::map<uint8_t, std::string> NATPMP_RESULT_STR{
     {0,  "SUCCESS"},
     {1,  "UNSUPP_VERSION"},
@@ -91,23 +91,23 @@ static const std::map<uint8_t, std::string> NATPMP_RESULT_STR{
 };
 
 // PCP (v2) protocol constants.
-//! Maximum packet size in bytes (RPC6887 section 7).
+//! Maximum packet size in bytes (RFC6887 section 7).
 constexpr size_t PCP_MAX_SIZE = 1100;
-//! PCP uses a fixed server port number (RPC6887 section 19.1). Shared with NAT-PMP.
+//! PCP uses a fixed server port number (RFC6887 section 19.1). Shared with NAT-PMP.
 constexpr uint16_t PCP_SERVER_PORT = NATPMP_SERVER_PORT;
 //! Version byte. 0 is NAT-PMP (RFC6886), 1 is forbidden, 2 for PCP (RFC6887).
 constexpr uint8_t PCP_VERSION = 2;
-//! PCP Request Header. See RPC6887 section 7.1. Shared with NAT-PMP.
+//! PCP Request Header. See RFC6887 section 7.1. Shared with NAT-PMP.
 constexpr uint8_t PCP_REQUEST = NATPMP_REQUEST; // R = 0
-//! PCP Response Header. See RPC6887 section 7.2. Shared with NAT-PMP.
+//! PCP Response Header. See RFC6887 section 7.2. Shared with NAT-PMP.
 constexpr uint8_t PCP_RESPONSE = NATPMP_RESPONSE; // R = 1
-//! Map opcode. See RPC6887 section 19.2
+//! Map opcode. See RFC6887 section 19.2
 constexpr uint8_t PCP_OP_MAP = 0x01;
 //! TCP protocol number (IANA).
 constexpr uint16_t PCP_PROTOCOL_TCP = 6;
-//! Request and response header size in bytes (RPC6887 section 7.1).
+//! Request and response header size in bytes (RFC6887 section 7.1).
 constexpr size_t PCP_HDR_SIZE = 24;
-//! Map request and response size in bytes (RPC6887 section 11.1).
+//! Map request and response size in bytes (RFC6887 section 11.1).
 constexpr size_t PCP_MAP_SIZE = 36;
 
 // Header offsets shared between request and responses (RFC6887 7.1, 7.2), relative to start of packet.
@@ -138,12 +138,12 @@ constexpr size_t PCP_MAP_EXTERNAL_PORT_OFS = 18;
 //!  Suggested external IP (request), assigned external IP (response) (16 bytes).
 constexpr size_t PCP_MAP_EXTERNAL_IP_OFS = 20;
 
-//! Result code representing success (RPC6887 7.4), shared with NAT-PMP.
+//! Result code representing success (RFC6887 7.4), shared with NAT-PMP.
 constexpr uint8_t PCP_RESULT_SUCCESS = NATPMP_RESULT_SUCCESS;
-//! Result code representing lack of resources (RPC6887 7.4).
+//! Result code representing lack of resources (RFC6887 7.4).
 constexpr uint8_t PCP_RESULT_NO_RESOURCES = 8;
 
-//! Mapping of PCP result code to string (RPC6887 7.4). Result codes <=2 match NAT-PMP.
+//! Mapping of PCP result code to string (RFC6887 7.4). Result codes <=2 match NAT-PMP.
 static const std::map<uint8_t, std::string> PCP_RESULT_STR{
     {0,  "SUCCESS"},
     {1,  "UNSUPP_VERSION"},
@@ -175,7 +175,7 @@ static std::string PCPResultString(uint8_t result_code)
     return strprintf("%s (code %d)", result_i == PCP_RESULT_STR.end() ? "(unknown)" : result_i->second,  result_code);
 }
 
-//! Wrap address in IPv6 according to RPC6887. wrapped_addr needs to be able to store 16 bytes.
+//! Wrap address in IPv6 according to RFC6887. wrapped_addr needs to be able to store 16 bytes.
 [[nodiscard]] static bool PCPWrapAddress(Span<uint8_t> wrapped_addr, const CNetAddr &addr)
 {
     Assume(wrapped_addr.size() == ADDR_IPV6_SIZE);
@@ -196,7 +196,7 @@ static std::string PCPResultString(uint8_t result_code)
     }
 }
 
-//! Unwrap PCP-encoded address according to RPC6887.
+//! Unwrap PCP-encoded address according to RFC6887.
 static CNetAddr PCPUnwrapAddress(Span<const uint8_t> wrapped_addr)
 {
     Assume(wrapped_addr.size() == ADDR_IPV6_SIZE);
@@ -429,7 +429,7 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
     // as required by the spec (and not potentially leak data).
     // Make sure there's space for the request header and MAP specific request data.
     std::vector<uint8_t>request(PCP_HDR_SIZE + PCP_MAP_SIZE);
-    // Fill in request header, See RPC6887 Figure 2.
+    // Fill in request header, See RFC6887 Figure 2.
     size_t ofs = 0;
     request[ofs + PCP_HDR_VERSION_OFS] = PCP_VERSION;
     request[ofs + PCP_HDR_OP_OFS] = PCP_REQUEST | PCP_OP_MAP;
@@ -438,7 +438,7 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
 
     ofs += PCP_HDR_SIZE;
 
-    // Fill in MAP request packet, See RPC6887 Figure 9.
+    // Fill in MAP request packet, See RFC6887 Figure 9.
     // Randomize mapping nonce (this is repeated in the response, to be able to
     // correlate requests and responses, and used to authenticate changes to the mapping).
     std::memcpy(request.data() + ofs + PCP_MAP_NONCE_OFS, nonce.data(), PCP_MAP_NONCE_SIZE);
@@ -467,7 +467,7 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
                 LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "pcp: Response to wrong command\n");
                 return false; // Wasn't response to what we expected, try receiving next packet.
             }
-            // Handle MAP opcode response. See RPC6887 Figure 10.
+            // Handle MAP opcode response. See RFC6887 Figure 10.
             // Check that returned mapping nonce matches our request.
             if (response.subspan(PCP_HDR_SIZE + PCP_MAP_NONCE_OFS, PCP_MAP_NONCE_SIZE) != Span(nonce)) {
                 LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "pcp: Mapping nonce mismatch\n");
