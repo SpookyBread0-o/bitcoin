@@ -978,7 +978,6 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     if (nUserMaxConnections < 0){
         return InitError(Untranslated("-maxconnections must be greater or equal than zero"));
     }
-
     // Reserve enough FDs to account for the bare minimum, plus any manual connections, plus the bound interfaces
     int min_required_fds = MIN_CORE_FDS + MAX_ADDNODE_CONNECTIONS + nBind;
 
