@@ -52,7 +52,8 @@ static bool ProcessPCP()
     bool ret = false;
     bool no_resources = false;
     const uint16_t private_port = GetListenPort();
-    const uint32_t requested_lifetime = std::chrono::seconds(PORT_MAPPING_REANNOUNCE_PERIOD).count();
+    // Multiply the reannounce period by two, as we'll try to renew approximately halfway.
+    const uint32_t requested_lifetime = std::chrono::seconds(PORT_MAPPING_REANNOUNCE_PERIOD * 2).count();
     uint32_t actual_lifetime = 0;
     std::chrono::milliseconds sleep_time;
 
