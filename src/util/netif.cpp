@@ -12,12 +12,18 @@
 #include <util/sock.h>
 #include <util/syserror.h>
 
+#ifdef __FreeBSD__
+#include <osreldate.h>
+#endif
+
 // Linux and FreeBSD 13.2+
-#if defined(__linux__) || (defined(__FreeBSD__) && __FreeBSD_version >= 1302000)
+#if defined(__linux__) || __FreeBSD_version >= 1302000
 
 #if defined(__linux__)
 #include <linux/rtnetlink.h>
 #elif defined(__FreeBSD__)
+// Workaround https://github.com/freebsd/freebsd-src/pull/1070.
+#define typeof __typeof
 #include <netlink/netlink.h>
 #include <netlink/netlink_route.h>
 #endif
@@ -80,8 +86,7 @@ static std::optional<CNetAddr> QueryDefaultGatewayImpl(sa_family_t family)
         return std::nullopt;
     }
 
-    size_t response_len = static_cast<size_t>(recv_result);
-    for (nlmsghdr* hdr = (nlmsghdr*)response; NLMSG_OK(hdr, response_len); hdr = NLMSG_NEXT(hdr, response_len)) {
+    for (nlmsghdr* hdr = (nlmsghdr*)response; NLMSG_OK(hdr, recv_result); hdr = NLMSG_NEXT(hdr, recv_result)) {
         rtmsg* r = (rtmsg*)NLMSG_DATA(hdr);
         int remaining_len = RTM_PAYLOAD(hdr);
 
