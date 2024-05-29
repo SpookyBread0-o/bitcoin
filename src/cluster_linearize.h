@@ -998,6 +998,136 @@ void PostLinearize(const DepGraph<S>& depgraph, Span<ClusterIndex> linearization
     }
 }
 
+/** Merge two linearizations for the same cluster into one that is as good as both.
+ *
+ * Complexity: O(N^2) where N=depgraph.TxCount(); O(N) if both inputs are identical.
+ */
+template<typename S>
+std::vector<ClusterIndex> MergeLinearizations(const DepGraph<S>& depgraph, Span<const ClusterIndex> lin1, Span<const ClusterIndex> lin2)
+{
+    Assume(lin1.size() == depgraph.TxCount());
+    Assume(lin2.size() == depgraph.TxCount());
+
+    /** Information about a specific input linearization. */
+    struct LinData
+    {
+        /** Chunk sets and their feerates, of what remains of the linearization. */
+        std::vector<std::pair<S, FeeFrac>> chunks;
+
+        /** Lower bound on how many initial elements of the linearization are done. */
+        ClusterIndex lin_done{0};
+
+        /** How many initial chunks of the linearization are done. */
+        ClusterIndex skip_chunks{0};
+
+        /** Fill the chunks variable, updating lin_done in the process. */
+        void BuildChunks(const DepGraph<S>& depgraph, Span<const ClusterIndex> lin, const S& todo) noexcept
+        {
+            Assume(chunks.empty());
+            // Update lin_done.
+            while (lin_done < lin.size() && !todo[lin[lin_done]]) ++lin_done;
+            // Iterate over the remaining entries in lin after position lin_done.
+            for (auto i = lin_done; i < lin.size(); ++i) {
+                const auto idx = lin[i];
+                if (!todo[idx]) continue;
+                // Start with an initial chunk containing just element idx.
+                std::pair<S, FeeFrac> add(S::Singleton(idx), depgraph.FeeRate(idx));
+                // Absorb existing final chunks into add while they have lower feerate.
+                while (!chunks.empty() && add.second >> chunks.back().second) {
+                    add.first |= chunks.back().first;
+                    add.second += chunks.back().second;
+                    chunks.pop_back();
+                }
+                // Remember new chunk.
+                chunks.push_back(std::move(add));
+            }
+        }
+
+        /** Initialize a LinData object for a given length of linearization. */
+        explicit LinData(const DepGraph<S>& depgraph, Span<const ClusterIndex> lin, const S& todo) noexcept
+        {
+            chunks.reserve(depgraph.TxCount());
+            BuildChunks(depgraph, lin, todo);
+        }
+
+        /** Get the next chunk (= highest feerate prefix) of what remains of the linearization. */
+        const std::pair<S, FeeFrac>& NextChunk() const noexcept
+        {
+            Assume(skip_chunks < chunks.size());
+            return chunks[skip_chunks];
+        }
+
+        /** Mark some subset of transactions as done, updating todo in the process. */
+        void MarkDone(const DepGraph<S>& depgraph, Span<const ClusterIndex> lin, const S& todo, const S& new_done) noexcept
+        {
+            Assume(new_done.Any());
+            Assume(!todo.Overlaps(new_done));
+            if (NextChunk().first == new_done) {
+                // If the newly done transactions exactly match the first chunk of the remainder of
+                // the linearization, we do not need to rechunk; just remember to skip one
+                // additional chunk.
+                ++skip_chunks;
+                // With new_done marked done, some prefix of lin will be done now. How long that
+                // prefix is depends on how many done elements were interspersed with new_done,
+                // but at least as many transactions as there are in new_done.
+                lin_done += new_done.Count();
+            } else {
+                chunks.clear();
+                skip_chunks = 0;
+                BuildChunks(depgraph, lin, todo);
+            }
+        }
+
+        /** Find the shortest intersection between best and the prefixes of remaining chunks
+         *  of the linearization that has a feerate not below best's. */
+        S Intersect(const DepGraph<S>& depgraph, const std::pair<S, FeeFrac>& best) const noexcept
+        {
+            std::pair<S, FeeFrac> accumulator;
+            for (auto i = skip_chunks; i < chunks.size(); ++i) {
+                const S to_add = chunks[i].first & best.first;
+                if (to_add.Any()) {
+                    accumulator.first |= to_add;
+                    if (accumulator.first == best.first) break;
+                    accumulator.second += depgraph.FeeRate(to_add);
+                    if (!(accumulator.second << best.second)) return accumulator.first;
+                }
+            }
+            return best.first;
+        }
+    };
+
+    /** Which indices into depgraph are left. */
+    S todo = S::Fill(depgraph.TxCount());
+    /** Information about the two input linearizations. */
+    LinData data1(depgraph, lin1, todo), data2(depgraph, lin2, todo);
+    /** Output linearization. */
+    std::vector<ClusterIndex> ret;
+    if (depgraph.TxCount() == 0) return ret;
+    ret.reserve(depgraph.TxCount());
+
+    while (true) {
+        // As there are transactions left, there must be chunks corresponding to them.
+        Assume(data1.chunks.size() > data1.skip_chunks);
+        Assume(data2.chunks.size() > data2.skip_chunks);
+        // Find the set to output by taking the best remaining chunk, and then intersecting it with
+        // prefixes of remaining chunks of the other linearization.
+        S new_done;
+        if (data2.NextChunk().second >> data1.NextChunk().second) {
+            new_done = data1.Intersect(depgraph, data2.NextChunk());
+        } else {
+            new_done = data2.Intersect(depgraph, data1.NextChunk());
+        }
+        // Output the result and mark it as done.
+        depgraph.AppendTopo(ret, new_done);
+        todo -= new_done;
+        if (todo.None()) break;
+        data1.MarkDone(depgraph, lin1, todo, new_done);
+        data2.MarkDone(depgraph, lin2, todo, new_done);
+    }
+
+    return ret;
+}
+
 } // namespace cluster_linearize
 
 #endif // BITCOIN_CLUSTER_LINEARIZE_H
