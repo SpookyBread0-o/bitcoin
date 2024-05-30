@@ -16,6 +16,7 @@
 #include <core_io.h>
 #include <deploymentinfo.h>
 #include <deploymentstatus.h>
+#include <interfaces/miner.h>
 #include <key_io.h>
 #include <net.h>
 #include <node/context.h>
@@ -44,6 +45,7 @@
 
 using node::BlockAssembler;
 using node::CBlockTemplate;
+using interfaces::Miner;
 using node::NodeContext;
 using node::RegenerateCommitments;
 using node::UpdateTime;
@@ -722,7 +724,8 @@ static RPCHelpMan getblocktemplate()
     if (strMode != "template")
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
-    if (!chainman.GetParams().IsTestChain()) {
+    Miner& miner = EnsureMiner(node);
+    if (!miner.isTestChain()) {
         const CConnman& connman = EnsureConnman(node);
         if (connman.GetNodeCount(ConnectionDirection::Both) == 0) {
             throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, PACKAGE_NAME " is not connected!");
