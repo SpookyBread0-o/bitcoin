@@ -77,7 +77,7 @@ static std::optional<CNetAddr> QueryDefaultGatewayImpl(sa_family_t family)
 
     // Receive response.
     char response[4096];
-    ssize_t recv_result;
+    int64_t recv_result;
     do {
         recv_result = sock.Recv(response, sizeof(response), 0);
     } while (recv_result < 0 && (errno == EINTR || errno == EAGAIN));
