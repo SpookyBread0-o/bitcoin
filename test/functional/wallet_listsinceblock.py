@@ -4,6 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the listsinceblock RPC."""
 
+import os
 from test_framework.address import key_to_p2wpkh
 from test_framework.blocktools import COINBASE_MATURITY
 from test_framework.descriptors import descsum_create
@@ -40,6 +41,7 @@ class ListSinceBlockTest(BitcoinTestFramework):
         self.test_no_blockhash()
         self.test_invalid_blockhash()
         self.test_reorg()
+        self.test_cant_read_block()
         self.test_double_spend()
         self.test_double_send()
         self.double_spends_filtered()
@@ -166,6 +168,31 @@ class ListSinceBlockTest(BitcoinTestFramework):
         transactions = self.nodes[0].listsinceblock(nodes1_last_blockhash)['transactions']
         found = next(tx for tx in transactions if tx['txid'] == senttx)
         assert_equal(found['blockheight'], self.nodes[0].getblockheader(nodes2_first_blockhash)['height'])
+
+    def test_cant_read_block(self):
+        self.log.info('Test passing cannot read block from disk rpc error')
+
+        # Split network into two
+        self.split_network()
+
+        # send to nodes[0] from nodes[2]
+        self.nodes[2].sendtoaddress(self.nodes[0].getnewaddress(), 1)
+
+        # generate on both sides
+        nodes1_last_blockhash = self.generate(self.nodes[1], 6, sync_fun=lambda: self.sync_all(self.nodes[:2]))[-1]
+        self.generate(self.nodes[2], 7, sync_fun=lambda: self.sync_all(self.nodes[2:]))[0]
+
+        self.join_network()
+
+        # Setting permissions to none
+        os.rename(self.nodes[0].blocks_path / "blk00000.dat", self.nodes[0].blocks_path / "blk00000.dat.copy")
+
+        # listsinceblock(nodes1_last_blockhash) should now fail as blocks are not accessible
+        assert_raises_rpc_error(-32603, "Can't read block from disk",
+            self.nodes[0].listsinceblock, nodes1_last_blockhash)
+
+        # ReSetting permissions to 600
+        os.rename(self.nodes[0].blocks_path / "blk00000.dat.copy", self.nodes[0].blocks_path / "blk00000.dat")
 
     def test_double_spend(self):
         '''
