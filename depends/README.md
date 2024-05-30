@@ -49,7 +49,7 @@ The paths are automatically configured and no other options are needed.
 
 #### For macOS cross compilation
 
-    sudo apt-get install g++ zip
+    sudo apt-get install clang lld llvm g++ zip
 
 Note: You must obtain the macOS SDK before proceeding with a cross-compile.
 Under the depends directory, create a subdirectory named `SDKs`.
