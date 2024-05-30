@@ -21,6 +21,17 @@
 #include <stdexcept>
 #include <vector>
 
+auto validateSignetChallenge(std::vector<std::string> signet_challenge) {
+    if (signet_challenge.size() != 1) {
+        throw std::runtime_error("-signetchallenge cannot be multiple values.");
+    }
+    const auto val{TryParseHex<uint8_t>(signet_challenge[0])};
+    if (!val) {
+        throw std::runtime_error(strprintf("-signetchallenge must be hex, not '%s'.", signet_challenge[0]));
+    }
+    return *val;
+}
+
 void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& options)
 {
     if (args.IsArgSet("-signetseednode")) {
@@ -28,14 +39,7 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
     }
     if (args.IsArgSet("-signetchallenge")) {
         const auto signet_challenge = args.GetArgs("-signetchallenge");
-        if (signet_challenge.size() != 1) {
-            throw std::runtime_error("-signetchallenge cannot be multiple values.");
-        }
-        const auto val{TryParseHex<uint8_t>(signet_challenge[0])};
-        if (!val) {
-            throw std::runtime_error(strprintf("-signetchallenge must be hex, not '%s'.", signet_challenge[0]));
-        }
-        options.challenge.emplace(*val);
+        options.challenge.emplace(validateSignetChallenge(signet_challenge));
     }
 }
 
