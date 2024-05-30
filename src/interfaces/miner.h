@@ -30,6 +30,10 @@ public:
     //! Returns the index entry for the tip of this chain, or nullptr if none.
     virtual CBlockIndex* getTip() = 0;
 
+    //! Return the number of transaction updates in the mempool,
+    //! used to decide whether to make a new block template.
+    virtual unsigned int getTransactionsUpdated() = 0;
+
     /** Construct a new block template with coinbase to scriptPubKeyIn */
     virtual std::unique_ptr<node::CBlockTemplate> createNewBlock(const CScript& scriptPubKeyIn) = 0;
 

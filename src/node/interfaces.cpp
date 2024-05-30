@@ -850,6 +850,11 @@ public:
         return chainman().ActiveChain().Tip();
     }
 
+    unsigned int getTransactionsUpdated() override
+    {
+        return context()->mempool->GetTransactionsUpdated();
+    }
+
     bool testBlockValidity(BlockValidationState& state, const CBlock& block, bool check_merkle_root) override
     {
         LOCK(::cs_main);
