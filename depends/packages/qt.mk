@@ -4,7 +4,7 @@ $(package)_download_path=https://download.qt.io/official_releases/qt/5.15/$($(pa
 $(package)_suffix=everywhere-opensource-src-$($(package)_version).tar.xz
 $(package)_file_name=qtbase-$($(package)_suffix)
 $(package)_sha256_hash=4cca51dcc1f22ceeee6b3e33cd1c3a60b14e85e24644dca3af89a2c2989ab809
-$(package)_linux_dependencies=freetype fontconfig libxcb libxkbcommon libxcb_util libxcb_util_render libxcb_util_keysyms libxcb_util_image libxcb_util_wm
+$(package)_linux_dependencies=qtsowrap
 $(package)_qt_libs=corelib network widgets gui plugins testlib
 $(package)_linguist_tools = lrelease lupdate lconvert
 $(package)_patches = qt.pro
@@ -23,6 +23,7 @@ $(package)_patches += memory_resource.patch
 $(package)_patches += utc_from_string_no_optimize.patch
 $(package)_patches += windows_lto.patch
 $(package)_patches += zlib-timebits64.patch
+$(package)_patches += qtsowrap.patch
 
 $(package)_qttranslations_file_name=qttranslations-$($(package)_suffix)
 $(package)_qttranslations_sha256_hash=24d4c58bc2a40c0f44f59ee64af4192c7d0038c1e45af61646cfc5b65058f271
@@ -235,6 +236,7 @@ define $(package)_preprocess_cmds
   patch -p1 -i $($(package)_patch_dir)/guix_cross_lib_path.patch && \
   patch -p1 -i $($(package)_patch_dir)/windows_lto.patch && \
   patch -p1 -i $($(package)_patch_dir)/zlib-timebits64.patch && \
+  patch -p1 -i $($(package)_patch_dir)/qtsowrap.patch && \
   mkdir -p qtbase/mkspecs/macx-clang-linux &&\
   cp -f qtbase/mkspecs/macx-clang/qplatformdefs.h qtbase/mkspecs/macx-clang-linux/ &&\
   cp -f $($(package)_patch_dir)/mac-qmake.conf qtbase/mkspecs/macx-clang-linux/qmake.conf && \
