@@ -17,7 +17,7 @@
 #endif
 
 // Linux and FreeBSD 13.2+
-#if defined(__linux__) || __FreeBSD_version >= 1302000
+#if defined(__linux__) || __FreeBSD_version >= 1400000
 
 #if defined(__linux__)
 #include <linux/rtnetlink.h>
