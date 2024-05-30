@@ -6,6 +6,7 @@
 #define BITCOIN_INTERFACES_MINER_H
 
 namespace node {
+struct CBlockTemplate;
 struct NodeContext;
 } // namespace node
 
@@ -28,6 +29,9 @@ public:
 
     //! Returns the index entry for the tip of this chain, or nullptr if none.
     virtual CBlockIndex* getTip() = 0;
+
+    /** Construct a new block template with coinbase to scriptPubKeyIn */
+    virtual std::unique_ptr<node::CBlockTemplate> createNewBlock(const CScript& scriptPubKeyIn) = 0;
 
     /**
      * Check a block is completely valid from start to finish.

@@ -32,6 +32,7 @@
 #include <node/context.h>
 #include <node/interface_ui.h>
 #include <node/mini_miner.h>
+#include <node/miner.h>
 #include <node/transaction.h>
 #include <policy/feerate.h>
 #include <policy/fees.h>
@@ -73,6 +74,7 @@ using interfaces::MakeSignalHandler;
 using interfaces::Miner;
 using interfaces::Node;
 using interfaces::WalletLoader;
+using node::BlockAssembler;
 
 namespace node {
 // All members of the classes in this namespace are intentionally public, as the
@@ -852,6 +854,13 @@ public:
     {
         LOCK(::cs_main);
         return TestBlockValidity(state, chainman().GetParams(), chainman().ActiveChainstate(), block, chainman().ActiveChain().Tip(), /*fCheckPOW=*/false, check_merkle_root);
+    }
+
+    std::unique_ptr<CBlockTemplate> createNewBlock(const CScript& scriptPubKeyIn) override
+    {
+        LOCK(::cs_main);
+        // TODO pass mempool sanely
+        return BlockAssembler{chainman().ActiveChainstate(), &*(context()->mempool)}.CreateNewBlock(scriptPubKeyIn);
     }
 
     NodeContext* context() override { return &m_node; }
