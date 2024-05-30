@@ -842,6 +842,12 @@ public:
         return chainman().GetParams().IsTestChain();
     }
 
+    CBlockIndex* getTip() override
+    {
+        LOCK(::cs_main);
+        return chainman().ActiveChain().Tip();
+    }
+
     bool testBlockValidity(BlockValidationState& state, const CBlock& block, bool check_merkle_root) override
     {
         LOCK(::cs_main);
