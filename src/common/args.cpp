@@ -388,6 +388,21 @@ std::vector<std::string> ArgsManager::GetArgs(const std::string& strArg) const
     return result;
 }
 
+std::vector<std::string> ArgsManager::GetSectionArg(const std::string& section, const std::string& strArg) const
+{
+    std::vector<std::string> result;
+    LOCK(cs_args);
+    if (auto* _section = common::FindKey(m_settings.ro_config, section)) {
+        if (auto* values = common::FindKey(*_section, strArg)) {
+            for (int i = 0; i < values->size(); i++) {
+                result.push_back((*values)[i].get_str());
+            }
+
+        }
+    }
+    return result;
+}
+
 bool ArgsManager::IsArgSet(const std::string& strArg) const
 {
     return !GetSetting(strArg).isNull();

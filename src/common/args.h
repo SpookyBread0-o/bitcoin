@@ -253,6 +253,15 @@ protected:
     std::vector<std::string> GetArgs(const std::string& strArg) const;
 
     /**
+     * Retrieves values associated with a specified argument in a given configuration section.
+     *
+     * @param section section in m_settings.ro_config to seach
+     * @param strArg Argument to get (e.g. "-foo")
+     * @return Vector of string values for the argument in the configuration file.
+     */
+    std::vector<std::string> GetSectionArg(const std::string& section, const std::string& strArg) const;
+
+    /**
      * Return true if the given argument has been manually set
      *
      * @param strArg Argument to get (e.g. "-foo")
