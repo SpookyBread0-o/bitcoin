@@ -337,6 +337,7 @@ static RPCHelpMan generateblock()
     }
 
     NodeContext& node = EnsureAnyNodeContext(request.context);
+    Miner& miner = EnsureMiner(node);
     const CTxMemPool& mempool = EnsureMemPool(node);
 
     std::vector<CTransactionRef> txs;
@@ -387,7 +388,7 @@ static RPCHelpMan generateblock()
         LOCK(cs_main);
 
         BlockValidationState state;
-        if (!TestBlockValidity(state, chainman.GetParams(), chainman.ActiveChainstate(), block, chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock), false, false)) {
+        if (!miner.testBlockValidity(state, block, /*check_merkle_root=*/false)) {
             throw JSONRPCError(RPC_VERIFY_ERROR, strprintf("TestBlockValidity failed: %s", state.ToString()));
         }
     }
@@ -662,6 +663,7 @@ static RPCHelpMan getblocktemplate()
 {
     NodeContext& node = EnsureAnyNodeContext(request.context);
     ChainstateManager& chainman = EnsureChainman(node);
+    Miner& miner = EnsureMiner(node);
     LOCK(cs_main);
 
     std::string strMode = "template";
@@ -694,6 +696,7 @@ static RPCHelpMan getblocktemplate()
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
             uint256 hash = block.GetHash();
+
             const CBlockIndex* pindex = chainman.m_blockman.LookupBlockIndex(hash);
             if (pindex) {
                 if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -703,12 +706,14 @@ static RPCHelpMan getblocktemplate()
                 return "duplicate-inconclusive";
             }
 
+            BlockValidationState state;
+            miner.testBlockValidity(state, block, /*check_merkle_root=*/true);
+
             CBlockIndex* const pindexPrev = active_chain.Tip();
             // TestBlockValidity only supports blocks built on the current Tip
-            if (block.hashPrevBlock != pindexPrev->GetBlockHash())
+            if (block.hashPrevBlock != pindexPrev->GetBlockHash()) {
                 return "inconclusive-not-best-prevblk";
-            BlockValidationState state;
-            TestBlockValidity(state, chainman.GetParams(), active_chainstate, block, pindexPrev, false, true);
+            }
             return BIP22ValidationResult(state);
         }
 
@@ -724,7 +729,6 @@ static RPCHelpMan getblocktemplate()
     if (strMode != "template")
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
-    Miner& miner = EnsureMiner(node);
     if (!miner.isTestChain()) {
         const CConnman& connman = EnsureConnman(node);
         if (connman.GetNodeCount(ConnectionDirection::Both) == 0) {
