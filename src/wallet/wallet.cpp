@@ -3602,6 +3602,16 @@ LegacyScriptPubKeyMan* CWallet::GetLegacyScriptPubKeyMan() const
     return dynamic_cast<LegacyScriptPubKeyMan*>(it->second);
 }
 
+LegacyDataSPKM* CWallet::GetLegacyDataSPKM() const
+{
+    if (IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
+        return nullptr;
+    }
+    auto it = m_internal_spk_managers.find(OutputType::LEGACY);
+    if (it == m_internal_spk_managers.end()) return nullptr;
+    return dynamic_cast<LegacyDataSPKM*>(it->second);
+}
+
 LegacyScriptPubKeyMan* CWallet::GetOrCreateLegacyScriptPubKeyMan()
 {
     SetupLegacyScriptPubKeyMan();
@@ -3618,13 +3628,26 @@ void CWallet::AddScriptPubKeyMan(const uint256& id, std::unique_ptr<ScriptPubKey
     MaybeUpdateBirthTime(spkm->GetTimeFirstKey());
 }
 
+LegacyDataSPKM* CWallet::GetOrCreateLegacyDataSPKM()
+{
+    SetupLegacyScriptPubKeyMan();
+    return GetLegacyDataSPKM();
+}
+
 void CWallet::SetupLegacyScriptPubKeyMan()
 {
     if (!m_internal_spk_managers.empty() || !m_external_spk_managers.empty() || !m_spk_managers.empty() || IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
         return;
     }
 
-    auto spk_manager = std::unique_ptr<ScriptPubKeyMan>(new LegacyScriptPubKeyMan(*this, m_keypool_size));
+    std::unique_ptr<ScriptPubKeyMan> spk_manager;
+
+    // Only create base LegacyDataSPKM if using BERKELEY_RO
+    if (m_database->Format() == "bdb_ro") {
+        spk_manager = std::unique_ptr<ScriptPubKeyMan>(new LegacyDataSPKM(*this));
+    } else {
+        spk_manager = std::unique_ptr<ScriptPubKeyMan>(new LegacyScriptPubKeyMan(*this, m_keypool_size));
+    }
     for (const auto& type : LEGACY_OUTPUT_TYPES) {
         m_internal_spk_managers[type] = spk_manager.get();
         m_external_spk_managers[type] = spk_manager.get();
@@ -3992,7 +4015,7 @@ std::optional<MigrationData> CWallet::GetDescriptorsForLegacy(bilingual_str& err
 {
     AssertLockHeld(cs_wallet);
 
-    LegacyScriptPubKeyMan* legacy_spkm = GetLegacyScriptPubKeyMan();
+    LegacyDataSPKM* legacy_spkm = GetLegacyDataSPKM();
     if (!Assume(legacy_spkm)) {
         // This shouldn't happen
         error = Untranslated(STR_INTERNAL_BUG("Error: Legacy wallet data missing"));
@@ -4011,7 +4034,7 @@ bool CWallet::ApplyMigrationData(MigrationData& data, bilingual_str& error)
 {
     AssertLockHeld(cs_wallet);
 
-    LegacyScriptPubKeyMan* legacy_spkm = GetLegacyScriptPubKeyMan();
+    LegacyDataSPKM* legacy_spkm = GetLegacyDataSPKM();
     if (!Assume(legacy_spkm)) {
         // This shouldn't happen
         error = Untranslated(STR_INTERNAL_BUG("Error: Legacy wallet data missing"));
@@ -4346,11 +4369,37 @@ util::Result<MigrationResult> MigrateLegacyToDescriptor(const std::string& walle
     // If the wallet is still loaded, unload it so that nothing else tries to use it while we're changing it
     bool was_loaded = false;
     if (auto wallet = GetWallet(context, wallet_name)) {
+        if (wallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
+            return util::Error{_("Error: This wallet is already a descriptor wallet")};
+        }
+
         if (!RemoveWallet(context, wallet, /*load_on_start=*/std::nullopt, warnings)) {
             return util::Error{_("Unable to unload the wallet before migrating")};
         }
         UnloadWallet(std::move(wallet));
         was_loaded = true;
+    } else {
+        // We need to load this wallet to check if there's something to migrate.
+        // But this cannot be reused later since we want to use BERKELEY_RO for the actual migration
+        WalletContext empty_context;
+        empty_context.args = context.args;
+        DatabaseOptions options;
+        options.require_existing = true;
+        DatabaseStatus status;
+        std::unique_ptr<WalletDatabase> database = MakeWalletDatabase(wallet_name, options, status, error);
+        if (!database) {
+            return util::Error{Untranslated("Wallet file verification failed.") + Untranslated(" ") + error};
+        }
+        wallet = CWallet::Create(empty_context, wallet_name, std::move(database), options.create_flags, error, warnings);
+        if (!wallet) {
+            return util::Error{Untranslated("Wallet loading failed.") + Untranslated(" ") + error};
+        }
+
+        if (wallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
+            return util::Error{_("Error: This wallet is already a descriptor wallet")};
+        }
+        // Unload
+        wallet.reset();
     }
 
     // Load the wallet but only in the context of this function.
@@ -4359,6 +4408,7 @@ util::Result<MigrationResult> MigrateLegacyToDescriptor(const std::string& walle
     empty_context.args = context.args;
     DatabaseOptions options;
     options.require_existing = true;
+    options.require_format = DatabaseFormat::BERKELEY_RO;
     DatabaseStatus status;
     std::unique_ptr<WalletDatabase> database = MakeWalletDatabase(wallet_name, options, status, error);
     if (!database) {
@@ -4438,6 +4488,7 @@ util::Result<MigrationResult> MigrateLegacyToDescriptor(const std::string& walle
     // both before and after reloading. This ensures the set is complete even if one of the wallets
     // fails to reload.
     std::set<fs::path> wallet_dirs;
+    options.require_format = std::nullopt;
     if (success) {
         // Migration successful, unload all wallets locally, then reload them.
         // Reload the main wallet
