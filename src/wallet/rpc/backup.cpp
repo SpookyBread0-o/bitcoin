@@ -507,6 +507,7 @@ RPCHelpMan importwallet()
     std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
     if (!pwallet) return UniValue::VNULL;
 
+    const auto& log{pwallet->m_log};
     EnsureLegacyScriptPubKeyMan(*pwallet, true);
 
     WalletRescanReserver reserver(*pwallet);
@@ -593,10 +594,10 @@ RPCHelpMan importwallet()
             CHECK_NONFATAL(key.VerifyPubKey(pubkey));
             CKeyID keyid = pubkey.GetID();
 
-            pwallet->WalletLogPrintf("Importing %s...\n", EncodeDestination(PKHash(keyid)));
+            LogInfo(log, "Importing %s...\n", EncodeDestination(PKHash(keyid)));
 
             if (!pwallet->ImportPrivKeys({{keyid, key}}, time)) {
-                pwallet->WalletLogPrintf("Error importing key for %s\n", EncodeDestination(PKHash(keyid)));
+                LogInfo(log, "Error importing key for %s\n", EncodeDestination(PKHash(keyid)));
                 fGood = false;
                 continue;
             }
@@ -611,7 +612,7 @@ RPCHelpMan importwallet()
             int64_t time = script_pair.second;
 
             if (!pwallet->ImportScripts({script}, time)) {
-                pwallet->WalletLogPrintf("Error importing script %s\n", HexStr(script));
+                LogInfo(log, "Error importing script %s\n", HexStr(script));
                 fGood = false;
                 continue;
             }
