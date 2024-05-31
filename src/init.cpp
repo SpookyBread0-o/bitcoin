@@ -321,7 +321,7 @@ void Shutdown(NodeContext& node)
     // FlushStateToDisk generates a ChainStateFlushed callback, which we should avoid missing
     if (node.chainman) {
         LOCK(cs_main);
-        for (Chainstate* chainstate : node.chainman->GetAll()) {
+        for (const auto& chainstate : node.chainman->m_chainstates) {
             if (chainstate->CanFlushToDisk()) {
                 chainstate->ForceFlushStateToDisk();
             }
@@ -347,7 +347,7 @@ void Shutdown(NodeContext& node)
 
     if (node.chainman) {
         LOCK(cs_main);
-        for (Chainstate* chainstate : node.chainman->GetAll()) {
+        for (const auto& chainstate : node.chainman->m_chainstates) {
             if (chainstate->CanFlushToDisk()) {
                 chainstate->ForceFlushStateToDisk();
                 chainstate->ResetCoinsViews();
@@ -1670,7 +1670,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     if (chainman.m_blockman.IsPruneMode()) {
         if (!chainman.m_blockman.m_reindexing) {
             LOCK(cs_main);
-            for (Chainstate* chainstate : chainman.GetAll()) {
+            for (const auto& chainstate : chainman.m_chainstates) {
                 uiInterface.InitMessage(_("Pruning blockstore…").translated);
                 chainstate->PruneAndFlush();
             }
@@ -1995,7 +1995,7 @@ bool StartIndexBackgroundSync(NodeContext& node)
     std::optional<const CBlockIndex*> indexes_start_block;
     std::string older_index_name;
     ChainstateManager& chainman = *Assert(node.chainman);
-    const Chainstate& chainstate = WITH_LOCK(::cs_main, return chainman.GetChainstateForIndexing());
+    const Chainstate& chainstate = WITH_LOCK(::cs_main, return chainman.ValidatedChainstate());
     const CChain& index_chain = chainstate.m_chain;
 
     for (auto index : node.indexes) {
