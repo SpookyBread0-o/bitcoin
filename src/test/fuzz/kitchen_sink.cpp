@@ -20,7 +20,7 @@ namespace {
 constexpr TransactionError ALL_TRANSACTION_ERROR[] = {
     TransactionError::OK,
     TransactionError::INPUTS_MISSING_OR_SPENT,
-    TransactionError::ALREADY_IN_CHAIN,
+    TransactionError::ALREADY_IN_UTXO_SET,
     TransactionError::P2P_DISABLED,
     TransactionError::MEMPOOL_REJECTED,
     TransactionError::MEMPOOL_ERROR,
