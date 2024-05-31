@@ -1088,9 +1088,10 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     coin_selection_params.tx_noinputs_size = 10 + GetSizeOfCompactSize(vecSend.size()); // bytes for output count
 
     // vouts to the payees
+    txNew.vout.reserve(vecSend.size() + 1); // accommodate the possible later inserts
     for (const auto& recipient : vecSend)
     {
-        CTxOut txout(recipient.nAmount, GetScriptForDestination(recipient.dest));
+        auto& txout = txNew.vout.emplace_back(recipient.nAmount, GetScriptForDestination(recipient.dest));
 
         // Include the fee cost for outputs.
         coin_selection_params.tx_noinputs_size += ::GetSerializeSize(txout);
@@ -1098,7 +1099,6 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         if (IsDust(txout, wallet.chain().relayDustFee())) {
             return util::Error{_("Transaction amount too small")};
         }
-        txNew.vout.push_back(txout);
     }
 
     // Include the fees for things that aren't inputs, excluding the change output
@@ -1187,6 +1187,7 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     // behavior."
     bool use_anti_fee_sniping = true;
     const uint32_t default_sequence{coin_control.m_signal_bip125_rbf.value_or(wallet.m_signal_rbf) ? MAX_BIP125_RBF_SEQUENCE : CTxIn::MAX_SEQUENCE_NONFINAL};
+    txNew.vin.reserve(selected_coins.size());
     for (const auto& coin : selected_coins) {
         std::optional<uint32_t> sequence = coin_control.GetSequence(coin->outpoint);
         if (sequence) {
