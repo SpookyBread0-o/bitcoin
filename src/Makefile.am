@@ -233,6 +233,7 @@ BITCOIN_CORE_H = \
   node/timeoffsets.h \
   node/transaction.h \
   node/txreconciliation.h \
+  node/types.h \
   node/utxo_snapshot.h \
   node/validation_cache_args.h \
   noui.h \
@@ -246,6 +247,7 @@ BITCOIN_CORE_H = \
   policy/rbf.h \
   policy/settings.h \
   pow.h \
+  private_broadcast.h \
   protocol.h \
   psbt.h \
   random.h \
@@ -448,6 +450,7 @@ libbitcoin_node_a_SOURCES = \
   policy/rbf.cpp \
   policy/settings.cpp \
   pow.cpp \
+  private_broadcast.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
   rpc/fees.cpp \

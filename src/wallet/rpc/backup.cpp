@@ -11,6 +11,7 @@
 #include <interfaces/chain.h>
 #include <key_io.h>
 #include <merkleblock.h>
+#include <node/types.h>
 #include <rpc/util.h>
 #include <script/descriptor.h>
 #include <script/script.h>
@@ -309,7 +310,7 @@ RPCHelpMan importaddress()
     if (fRescan)
     {
         RescanWallet(*pwallet, reserver);
-        pwallet->ResubmitWalletTransactions(/*relay=*/false, /*force=*/true);
+        pwallet->ResubmitWalletTransactions(node::ADD_TO_MEMPOOL_NO_BROADCAST, /*force=*/true);
     }
 
     return UniValue::VNULL;
@@ -475,7 +476,7 @@ RPCHelpMan importpubkey()
     if (fRescan)
     {
         RescanWallet(*pwallet, reserver);
-        pwallet->ResubmitWalletTransactions(/*relay=*/false, /*force=*/true);
+        pwallet->ResubmitWalletTransactions(node::ADD_TO_MEMPOOL_NO_BROADCAST, /*force=*/true);
     }
 
     return UniValue::VNULL;
@@ -1389,7 +1390,7 @@ RPCHelpMan importmulti()
     }
     if (fRescan && fRunScan && requests.size()) {
         int64_t scannedTime = pwallet->RescanFromTime(nLowestTimestamp, reserver, /*update=*/true);
-        pwallet->ResubmitWalletTransactions(/*relay=*/false, /*force=*/true);
+        pwallet->ResubmitWalletTransactions(node::ADD_TO_MEMPOOL_NO_BROADCAST, /*force=*/true);
 
         if (pwallet->IsAbortingRescan()) {
             throw JSONRPCError(RPC_MISC_ERROR, "Rescan aborted by user.");
@@ -1683,7 +1684,7 @@ RPCHelpMan importdescriptors()
     // Rescan the blockchain using the lowest timestamp
     if (rescan) {
         int64_t scanned_time = pwallet->RescanFromTime(lowest_timestamp, reserver, /*update=*/true);
-        pwallet->ResubmitWalletTransactions(/*relay=*/false, /*force=*/true);
+        pwallet->ResubmitWalletTransactions(node::ADD_TO_MEMPOOL_NO_BROADCAST, /*force=*/true);
 
         if (pwallet->IsAbortingRescan()) {
             throw JSONRPCError(RPC_MISC_ERROR, "Rescan aborted by user.");
