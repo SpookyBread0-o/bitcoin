@@ -21,6 +21,17 @@
 #include <stdexcept>
 #include <vector>
 
+auto validateSignetChallenge(std::vector<std::string> signet_challenge) {
+    if (signet_challenge.size() != 1) {
+        throw std::runtime_error("-signetchallenge cannot be multiple values.");
+    }
+    const auto val{TryParseHex<uint8_t>(signet_challenge[0])};
+    if (!val) {
+        throw std::runtime_error(strprintf("-signetchallenge must be hex, not '%s'.", signet_challenge[0]));
+    }
+    return *val;
+}
+
 void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& options)
 {
     if (args.IsArgSet("-signetseednode")) {
@@ -28,14 +39,21 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
     }
     if (args.IsArgSet("-signetchallenge")) {
         const auto signet_challenge = args.GetArgs("-signetchallenge");
-        if (signet_challenge.size() != 1) {
-            throw std::runtime_error("-signetchallenge cannot be multiple values.");
+        options.challenge.emplace(validateSignetChallenge(signet_challenge));
+    }
+}
+
+void ReadSigNetChainArgs(const ArgsManager& args, CChainParams::SigNetOptions& options) {
+    const auto chain = args.GetArg("-chain", "");
+    if (chain.starts_with("signet_")){
+        auto seed_node = args.GetSectionArg(chain, "signetseednode");
+        if (!seed_node.empty()) {
+            options.seeds.emplace(seed_node);
         }
-        const auto val{TryParseHex<uint8_t>(signet_challenge[0])};
-        if (!val) {
-            throw std::runtime_error(strprintf("-signetchallenge must be hex, not '%s'.", signet_challenge[0]));
+        auto signet_challenge = args.GetSectionArg(chain, "signetchallenge");
+        if (!signet_challenge.empty()) {
+            options.challenge.emplace(validateSignetChallenge(signet_challenge));
         }
-        options.challenge.emplace(*val);
     }
 }
 
@@ -116,6 +134,7 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
     case ChainType::SIGNET: {
         auto opts = CChainParams::SigNetOptions{};
         ReadSigNetArgs(args, opts);
+        ReadSigNetChainArgs(gArgs, opts);
         return CChainParams::SigNet(opts);
     }
     case ChainType::REGTEST: {

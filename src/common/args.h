@@ -211,6 +211,14 @@ protected:
     std::optional<const Command> GetCommand() const;
 
     /**
+     * Get signet data directory path.
+     * If a signet-challange argument is provided, it is used in constructing the directory path.
+     *
+     * @return The path to the signet data directory.
+    */
+    fs::path GetSignetDataDir() const;
+
+    /**
      * Get blocks directory path
      *
      * @return Blocks path which is network specific
@@ -243,6 +251,15 @@ protected:
      * @return command-line arguments
      */
     std::vector<std::string> GetArgs(const std::string& strArg) const;
+
+    /**
+     * Retrieves values associated with a specified argument in a given configuration section.
+     *
+     * @param section section in m_settings.ro_config to seach
+     * @param strArg Argument to get (e.g. "-foo")
+     * @return Vector of string values for the argument in the configuration file.
+     */
+    std::vector<std::string> GetSectionArg(const std::string& section, const std::string& strArg) const;
 
     /**
      * Return true if the given argument has been manually set
