@@ -293,6 +293,7 @@ test_fuzz_fuzz_SOURCES = \
  test/fuzz/bech32.cpp \
  test/fuzz/bip324.cpp \
  test/fuzz/bitdeque.cpp \
+ test/fuzz/bitset.cpp \
  test/fuzz/block.cpp \
  test/fuzz/block_header.cpp \
  test/fuzz/blockfilter.cpp \
@@ -300,6 +301,7 @@ test_fuzz_fuzz_SOURCES = \
  test/fuzz/buffered_file.cpp \
  test/fuzz/chain.cpp \
  test/fuzz/checkqueue.cpp \
+ test/fuzz/cluster_linearize.cpp \
  test/fuzz/coins_view.cpp \
  test/fuzz/coinscache_sim.cpp \
  test/fuzz/connman.cpp \
@@ -396,6 +398,7 @@ test_fuzz_fuzz_SOURCES = \
  test/fuzz/utxo_snapshot.cpp \
  test/fuzz/utxo_total_supply.cpp \
  test/fuzz/validation_load_mempool.cpp \
+ test/fuzz/vecdeque.cpp \
  test/fuzz/versionbits.cpp
 endif # ENABLE_FUZZ_BINARY
 
