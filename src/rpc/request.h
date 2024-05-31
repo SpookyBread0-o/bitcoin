@@ -11,6 +11,7 @@
 #include <string>
 
 #include <univalue.h>
+#include <util/fs.h>
 
 enum class JSONRPCVersion {
     V1_LEGACY,
@@ -22,7 +23,7 @@ UniValue JSONRPCReplyObj(UniValue result, UniValue error, std::optional<UniValue
 UniValue JSONRPCError(int code, const std::string& message);
 
 /** Generate a new RPC authentication cookie and write it to disk */
-bool GenerateAuthCookie(std::string *cookie_out);
+bool GenerateAuthCookie(std::string* cookie_out, fs::perms cookie_perms);
 /** Read the RPC authentication cookie from disk */
 bool GetAuthCookie(std::string *cookie_out);
 /** Delete RPC authentication cookie from disk */
