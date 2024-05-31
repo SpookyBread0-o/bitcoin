@@ -21,8 +21,8 @@ struct bilingual_str;
 
 enum class TransactionError {
     OK, //!< No error
-    MISSING_INPUTS,
-    ALREADY_IN_CHAIN,
+    INPUTS_MISSING_OR_SPENT,
+    ALREADY_IN_UTXO_SET,
     P2P_DISABLED,
     MEMPOOL_REJECTED,
     MEMPOOL_ERROR,

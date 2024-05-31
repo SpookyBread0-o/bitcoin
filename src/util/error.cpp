@@ -15,10 +15,10 @@ bilingual_str TransactionErrorString(const TransactionError err)
     switch (err) {
         case TransactionError::OK:
             return Untranslated("No error");
-        case TransactionError::MISSING_INPUTS:
+        case TransactionError::INPUTS_MISSING_OR_SPENT:
             return Untranslated("Inputs missing or spent");
-        case TransactionError::ALREADY_IN_CHAIN:
-            return Untranslated("Transaction already in block chain");
+        case TransactionError::ALREADY_IN_UTXO_SET:
+            return Untranslated("Transaction outputs already in utxo set");
         case TransactionError::P2P_DISABLED:
             return Untranslated("Peer-to-peer functionality missing or disabled");
         case TransactionError::MEMPOOL_REJECTED:

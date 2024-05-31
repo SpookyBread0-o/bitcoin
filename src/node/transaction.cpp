@@ -22,7 +22,7 @@ static TransactionError HandleATMPError(const TxValidationState& state, std::str
     err_string_out = state.ToString();
     if (state.IsInvalid()) {
         if (state.GetResult() == TxValidationResult::TX_MISSING_INPUTS) {
-            return TransactionError::MISSING_INPUTS;
+            return TransactionError::INPUTS_MISSING_OR_SPENT;
         }
         return TransactionError::MEMPOOL_REJECTED;
     } else {
@@ -53,8 +53,8 @@ TransactionError BroadcastTransaction(NodeContext& node, const CTransactionRef t
         for (size_t o = 0; o < tx->vout.size(); o++) {
             const Coin& existingCoin = view.AccessCoin(COutPoint(txid, o));
             // IsSpent doesn't mean the coin is spent, it means the output doesn't exist.
-            // So if the output does exist, then this transaction exists in the chain.
-            if (!existingCoin.IsSpent()) return TransactionError::ALREADY_IN_CHAIN;
+            // So if the output does exist, then this transaction exists in the utxo set.
+            if (!existingCoin.IsSpent()) return TransactionError::ALREADY_IN_UTXO_SET;
         }
 
         if (auto mempool_tx = node.mempool->get(txid); mempool_tx) {
