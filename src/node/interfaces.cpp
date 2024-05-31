@@ -8,12 +8,14 @@
 #include <chain.h>
 #include <chainparams.h>
 #include <common/args.h>
+#include <consensus/validation.h>
 #include <deploymentstatus.h>
 #include <external_signer.h>
 #include <index/blockfilterindex.h>
 #include <init.h>
 #include <interfaces/chain.h>
 #include <interfaces/handler.h>
+#include <interfaces/miner.h>
 #include <interfaces/node.h>
 #include <interfaces/wallet.h>
 #include <kernel/chain.h>
@@ -30,6 +32,7 @@
 #include <node/context.h>
 #include <node/interface_ui.h>
 #include <node/mini_miner.h>
+#include <node/miner.h>
 #include <node/transaction.h>
 #include <policy/feerate.h>
 #include <policy/fees.h>
@@ -68,8 +71,10 @@ using interfaces::Chain;
 using interfaces::FoundBlock;
 using interfaces::Handler;
 using interfaces::MakeSignalHandler;
+using interfaces::Miner;
 using interfaces::Node;
 using interfaces::WalletLoader;
+using node::BlockAssembler;
 
 namespace node {
 // All members of the classes in this namespace are intentionally public, as the
@@ -828,10 +833,55 @@ public:
     ValidationSignals& validation_signals() { return *Assert(m_node.validation_signals); }
     NodeContext& m_node;
 };
+
+class MinerImpl : public Miner
+{
+public:
+    explicit MinerImpl(NodeContext& node) : m_node(node) {}
+
+    bool isTestChain() override
+    {
+        return chainman().GetParams().IsTestChain();
+    }
+
+    CBlockIndex* getTip() override
+    {
+        LOCK(::cs_main);
+        return chainman().ActiveChain().Tip();
+    }
+
+    bool processNewBlock(const std::shared_ptr<const CBlock>& block, bool* new_block) override
+    {
+        return chainman().ProcessNewBlock(block, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/new_block);
+    }
+
+    unsigned int getTransactionsUpdated() override
+    {
+        return context()->mempool->GetTransactionsUpdated();
+    }
+
+    bool testBlockValidity(BlockValidationState& state, const CBlock& block, bool check_merkle_root) override
+    {
+        LOCK(::cs_main);
+        return TestBlockValidity(state, chainman().GetParams(), chainman().ActiveChainstate(), block, chainman().ActiveChain().Tip(), /*fCheckPOW=*/false, check_merkle_root);
+    }
+
+    std::unique_ptr<CBlockTemplate> createNewBlock(const CScript& scriptPubKeyIn) override
+    {
+        LOCK(::cs_main);
+        // TODO pass mempool sanely
+        return BlockAssembler{chainman().ActiveChainstate(), &*(context()->mempool)}.CreateNewBlock(scriptPubKeyIn);
+    }
+
+    NodeContext* context() override { return &m_node; }
+    ChainstateManager& chainman() { return *Assert(m_node.chainman); }
+    NodeContext& m_node;
+};
 } // namespace
 } // namespace node
 
 namespace interfaces {
 std::unique_ptr<Node> MakeNode(node::NodeContext& context) { return std::make_unique<node::NodeImpl>(context); }
 std::unique_ptr<Chain> MakeChain(node::NodeContext& context) { return std::make_unique<node::ChainImpl>(context); }
+std::unique_ptr<Miner> MakeMiner(node::NodeContext& context) { return std::make_unique<node::MinerImpl>(context); }
 } // namespace interfaces

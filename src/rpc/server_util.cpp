@@ -101,6 +101,14 @@ CConnman& EnsureConnman(const NodeContext& node)
     return *node.connman;
 }
 
+interfaces::Miner& EnsureMiner(const NodeContext& node)
+{
+    if (!node.miner) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Node miner not found");
+    }
+    return *node.miner;
+}
+
 PeerManager& EnsurePeerman(const NodeContext& node)
 {
     if (!node.peerman) {
