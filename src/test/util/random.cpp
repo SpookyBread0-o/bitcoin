@@ -39,5 +39,5 @@ void SeedRandomForTest(SeedRand seedtype)
         use_seed = uint256::ZERO;
     }
     MakeRandDeterministicDANGEROUS(use_seed);
-    g_insecure_rand_ctx = FastRandomContext(GetRandHash());
+    g_insecure_rand_ctx.Reseed(GetRandHash());
 }
