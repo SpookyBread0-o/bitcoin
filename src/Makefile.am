@@ -289,6 +289,7 @@ BITCOIN_CORE_H = \
   undo.h \
   util/any.h \
   util/asmap.h \
+  util/bag.h \
   util/batchpriority.h \
   util/bip32.h \
   util/bitdeque.h \
